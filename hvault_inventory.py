@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Licensed under the Apache License, Version 2.0
-"""
-Populate a Ansible inventory with information from HashiCorp Vault and
-use SSH OTP for host access.
-"""
+
 import argparse
 import os
 import sys
@@ -63,7 +60,7 @@ try:
     client = hvac.Client(
         url=os.environ["VAULT_ADDR"],
         token=os.environ["VAULT_TOKEN"],
-        namespace=os.environ('VAULT_NAMESPACE')
+        namespace=os.environ["VAULT_NAMESPACE"]
     )
 
 except KeyError as error:
