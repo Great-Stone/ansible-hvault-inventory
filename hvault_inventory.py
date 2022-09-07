@@ -10,7 +10,7 @@ import os
 import sys
 from io import BytesIO
 import hvac
-import pycurl
+import requests
 
 try:
     import json
@@ -28,6 +28,8 @@ inventory = {}
 inventory["vault_hosts"] = []
 inventory["_meta"] = {}
 inventory["_meta"]["hostvars"] = {}
+
+ssh_path = "ansible-ssh"
 
 parser = argparse.ArgumentParser(
     description="Dynamic HashiCorp Vault inventory.",
@@ -61,6 +63,7 @@ try:
     client = hvac.Client(
         url=os.environ["VAULT_ADDR"],
         token=os.environ["VAULT_TOKEN"],
+        namespace=os.environ('VAULT_NAMESPACE')
     )
 
 except KeyError as error:
@@ -78,6 +81,11 @@ except hvac.exceptions.InvalidPath as exception_string:
     sys.exit(1)
 
 
+headers = {
+  'X-Vault-Token': os.environ["VAULT_TOKEN"],
+  'X-Vault-Namespace': os.environ["VAULT_NAMESPACE"]
+}
+
 for host in hosts_read_response["data"]["data"]:
     name = host
     ansible_host = hosts_read_response["data"]["data"][host]
@@ -92,21 +100,10 @@ for host in hosts_read_response["data"]["data"]:
     post_data = {"ip": ansible_host}
 
     if not args.password_only:
-        postfields = urlencode(post_data)
-        buffer = BytesIO()
+        URL = os.environ["VAULT_ADDR"] + f"/v1/{ssh_path}/creds/otp-key-role"
+        res = requests.post(URL, headers=headers, data=post_data)
 
-        otp = pycurl.Curl()
-        otp.setopt(otp.URL, os.environ["VAULT_ADDR"] + "/v1/ssh/creds/otp_key_role")
-        otp.setopt(otp.WRITEFUNCTION, buffer.write)
-        otp.setopt(otp.POSTFIELDS, postfields)
-        otp.setopt(
-            otp.HTTPHEADER,
-            ["X-Vault-Request: true", "X-Vault-Token:" + os.environ["VAULT_TOKEN"]],
-        )
-        otp.perform()
-        otp.close()
-
-        ssh_creds_response = json.loads(buffer.getvalue().decode("utf-8"))
+        ssh_creds_response = res.json()
 
         try:
             if ssh_creds_response["data"]["username"]:
